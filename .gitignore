@@ -1,0 +1,19 @@
+# Visual Studio
+.vs/
+x64/
+ARM64/
+Debug/
+Release/
+*.user
+*.suo
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Runtime files - never commit
+me.info
+priv.key
+defensive.db
+server/storage/
