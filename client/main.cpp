@@ -6,6 +6,9 @@
 #include <iomanip>
 #include <algorithm>
 #include <stdexcept>
+#include "Endian.h"
+#include <vector>
+#include <stdexcept>
 
 void hexify(const unsigned char* buffer, unsigned int length)
 {
@@ -92,6 +95,57 @@ int rsa_example()
 	return 0;
 }
 
+// Prints OK/FAIL for one check, so each result is visible on its own line.
+void check(const char* name, bool passed)
+{
+	std::cout << (passed ? "OK   " : "FAIL ") << name << std::endl;
+}
+
+int endian_test()
+{
+	std::cout << std::endl << std::endl << "----- ENDIAN TEST -----" << std::endl << std::endl;
+
+	// 1. Known values - computed by hand earlier
+	std::vector<uint8_t> buf16;
+	appendU16(buf16, 825);
+	check("appendU16(825) == 39 03", buf16 == std::vector<uint8_t>{ 0x39, 0x03 });
+	hexify(buf16.data(), static_cast<unsigned int>(buf16.size()));
+
+	std::vector<uint8_t> buf32;
+	appendU32(buf32, 415);
+	check("appendU32(415) == 9F 01 00 00", buf32 == std::vector<uint8_t>{ 0x9F, 0x01, 0x00, 0x00 });
+	hexify(buf32.data(), static_cast<unsigned int>(buf32.size()));
+
+	// 2. Round trip - read back what was written
+	check("readU16 round trip == 825", readU16(buf16, 0) == 825);
+	check("readU32 round trip == 415", readU32(buf32, 0) == 415);
+
+	// 3. High byte >= 0x80 - the case where the sign bit matters in readU32
+	std::vector<uint8_t> bufHigh;
+	appendU32(bufHigh, 0x80000001);
+	check("readU32 round trip == 0x80000001", readU32(bufHigh, 0) == 0x80000001);
+
+	// 4. Bounds - reading past the end must throw, not read garbage
+	std::vector<uint8_t> shortBuf{ 0x01, 0x02, 0x03 };
+	try {
+		readU32(shortBuf, 0);
+		check("readU32 on 3 bytes throws", false);
+	}
+	catch (const std::out_of_range&) {
+		check("readU32 on 3 bytes throws", true);
+	}
+
+	// 5. Huge offset - the overflow case: offset + n would wrap around to a small number
+	try {
+		readU16(shortBuf, SIZE_MAX);
+		check("readU16 with SIZE_MAX offset throws", false);
+	}
+	catch (const std::out_of_range&) {
+		check("readU16 with SIZE_MAX offset throws", true);
+	}
+
+	return 0;
+}
 
 
 int main()
@@ -99,6 +153,8 @@ int main()
 	aes_example();
 	
 	rsa_example();
+
+	endian_test();
 
 	return 0;
 }
