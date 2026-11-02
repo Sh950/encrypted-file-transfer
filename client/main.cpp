@@ -1,6 +1,7 @@
 #include "Base64Wrapper.h"
 #include "RSAWrapper.h"
 #include "AESWrapper.h"
+#include "Protocol.h"
 
 #include <iostream>
 #include <iomanip>
@@ -147,6 +148,42 @@ int endian_test()
 	return 0;
 }
 
+int protocol_test()
+{
+	std::cout << std::endl << std::endl << "----- PROTOCOL TEST -----" << std::endl << std::endl;
+
+	// 1. Registration request: zero ID, code 825, 255-byte name payload
+	Protocol::ClientId id{};	// {} zero-fills all 16 bytes
+	std::vector<uint8_t> payload(Protocol::NAME_SIZE, 0);
+	std::vector<uint8_t> req = Protocol::buildRequest(id, Protocol::RequestCode::Register, payload);
+
+	check("request size == 278 (23 + 255)", req.size() == Protocol::REQUEST_HEADER_SIZE + Protocol::NAME_SIZE);
+
+	// Bytes 0..15 - client ID, all zeros
+	check("client ID == 16 zeros",
+		std::vector<uint8_t>(req.begin(), req.begin() + 16) == std::vector<uint8_t>(16, 0));
+
+	// Bytes 16..22 - version, code, payload size
+	check("header bytes 16..22 == 03 39 03 FF 00 00 00",
+		std::vector<uint8_t>(req.begin() + 16, req.begin() + 23) == std::vector<uint8_t>{ 0x03, 0x39, 0x03, 0xFF, 0x00, 0x00, 0x00 });
+	hexify(req.data() + 16, 7);
+
+	// 2. Non-zero ID - make sure the ID is copied as is, byte order unchanged
+	Protocol::ClientId id2{};
+	for (size_t i = 0; i < id2.size(); i++)
+		id2[i] = static_cast<uint8_t>(i + 1);	// 01 02 03 ... 10
+	std::vector<uint8_t> req2 = Protocol::buildRequest(id2, Protocol::RequestCode::SendFile, {});
+	check("ID copied as 01..10", std::vector<uint8_t>(req2.begin(), req2.begin() + 16) == std::vector<uint8_t>(id2.begin(), id2.end()));
+
+	// 3. Code 828 = 0x033C -> 3C 03
+	check("code 828 == 3C 03", req2[17] == 0x3C && req2[18] == 0x03);
+
+	// 4. Empty payload - header only, size field 00 00 00 00
+	check("empty payload -> size 23", req2.size() == Protocol::REQUEST_HEADER_SIZE);
+	check("empty payload -> size field == 00 00 00 00",readU32(req2, 19) == 0);
+
+	return 0;
+}
 
 int main()
 {
@@ -155,6 +192,8 @@ int main()
 	rsa_example();
 
 	endian_test();
+
+	protocol_test();
 
 	return 0;
 }

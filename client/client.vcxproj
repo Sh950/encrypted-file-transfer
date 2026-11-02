@@ -149,12 +149,14 @@
     <ClCompile Include="Base64Wrapper.cpp" />
     <ClCompile Include="Endian.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Protocol.cpp" />
     <ClCompile Include="RSAWrapper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AESWrapper.h" />
     <ClInclude Include="Base64Wrapper.h" />
     <ClInclude Include="Endian.h" />
+    <ClInclude Include="Protocol.h" />
     <ClInclude Include="RSAWrapper.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
