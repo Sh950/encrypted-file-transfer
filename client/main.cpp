@@ -286,6 +286,38 @@ int public_key_payload_test()
 	return 0;
 }
 
+int file_packet_payload_test()
+{
+	std::cout << std::endl << std::endl << "----- FILE PACKET PAYLOAD TEST -----" << std::endl << std::endl;
+
+	std::vector<uint8_t> chunk{ 0xAA, 0xBB, 0xCC, 0xDD };
+	std::vector<uint8_t> p = Protocol::makeFilePacketPayload(1000, 990, 2, 3, "file.txt", chunk);
+
+	check("size == 267 + 4", p.size() == Protocol::FILE_PACKET_HEADER_SIZE + chunk.size());
+	check("content size == 1000", readU32(p, 0) == 1000);
+	check("orig size == 990", readU32(p, 4) == 990);
+	check("packet number == 2", readU16(p, 8) == 2);
+	check("total packets == 3", readU16(p, 10) == 3);
+	check("file name at offset 12", p[12] == 'f' && p[19] == 't' && p[20] == 0x00);
+	check("chunk at offset 267",
+		std::vector<uint8_t>(p.begin() + Protocol::FILE_PACKET_HEADER_SIZE, p.end()) == chunk);
+
+	// Invalid inputs
+	auto expectThrow = [&](const char* name, auto call) {
+		try { call(); check(name, false); }
+		catch (const std::exception&) { check(name, true); }
+		};
+	expectThrow("total packets 0 throws", [&] { Protocol::makeFilePacketPayload(1000, 990, 1, 0, "f", chunk); });
+	expectThrow("packet number 0 throws", [&] { Protocol::makeFilePacketPayload(1000, 990, 0, 3, "f", chunk); });
+	expectThrow("packet 4 of 3 throws", [&] { Protocol::makeFilePacketPayload(1000, 990, 4, 3, "f", chunk); });
+	expectThrow("empty chunk throws", [&] { Protocol::makeFilePacketPayload(1000, 990, 1, 1, "f", {}); });
+	expectThrow("chunk > content throws", [&] { Protocol::makeFilePacketPayload(2, 990, 1, 1, "f", chunk); });
+	expectThrow("empty file name throws", [&] { Protocol::makeFilePacketPayload(1000, 990, 1, 1, "", chunk); });
+
+	return 0;
+}
+
+
 
 int main()
 {
@@ -300,6 +332,8 @@ int main()
 	name_field_test();
 
 	public_key_payload_test();
+
+	file_packet_payload_test();
 
 	return 0;
 }

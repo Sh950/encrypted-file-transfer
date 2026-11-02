@@ -56,6 +56,7 @@ namespace Protocol
 	constexpr size_t ORIG_SIZE_SIZE = 4;
 	constexpr size_t PACKET_NUMBER_SIZE = 2;
 	constexpr size_t TOTAL_PACKETS_SIZE = 2;
+	constexpr size_t FILE_PACKET_HEADER_SIZE = CONTENT_SIZE_SIZE + ORIG_SIZE_SIZE + PACKET_NUMBER_SIZE + TOTAL_PACKETS_SIZE + NAME_SIZE;
 	constexpr size_t CKSUM_SIZE = 4;
 
 	// ----- Crypto sizes - taken from the wrappers, not redefined (single source of truth) -----
@@ -72,8 +73,12 @@ namespace Protocol
 	static_assert(REQUEST_HEADER_SIZE == 23, "request header must be 23 bytes");
 	static_assert(RESPONSE_HEADER_SIZE == 7, "response header must be 7 bytes");
 	static_assert(MAX_CLIENT_NAME_LENGTH < NAME_SIZE, "name must fit with its null terminator");
+	static_assert(FILE_PACKET_HEADER_SIZE == 267, "828 fixed part must be 267 bytes");
 
 	std::vector<uint8_t> buildRequest(const ClientId& clientId, RequestCode code, const std::vector<uint8_t>& payload);
 	std::vector<uint8_t> makeNameField(const std::string& name);
 	std::vector<uint8_t> makePublicKeyPayload(const std::string& name, const std::string& publicKey);
+	std::vector<uint8_t> makeFilePacketPayload(uint32_t contentSize, uint32_t origSize,
+		uint16_t packetNumber, uint16_t totalPackets,
+		const std::string& fileName, const std::vector<uint8_t>& chunk);
 }

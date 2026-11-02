@@ -49,4 +49,38 @@ namespace Protocol
 
 		return payload;
 	}
+
+	std::vector<uint8_t> makeFilePacketPayload(uint32_t contentSize,
+		uint32_t origSize,
+		uint16_t packetNumber,
+		uint16_t totalPackets,
+		const std::string& fileName,
+		const std::vector<uint8_t>& chunk)
+	{
+		if (totalPackets == 0)
+			throw std::invalid_argument("makeFilePacketPayload: total packets must be at least 1");
+		if (packetNumber == 0 || packetNumber > totalPackets)
+			throw std::out_of_range("makeFilePacketPayload: packet number must be in 1..total packets");
+		if (chunk.empty())
+			throw std::invalid_argument("makeFilePacketPayload: packet content is empty");
+		if (chunk.size() > contentSize)
+			throw std::length_error("makeFilePacketPayload: packet larger than the whole encrypted file");
+
+		std::vector<uint8_t> payload;
+		payload.reserve(FILE_PACKET_HEADER_SIZE + chunk.size());
+
+		appendU32(payload, contentSize);	
+		appendU32(payload, origSize);
+
+		appendU16(payload, packetNumber);
+		appendU16(payload, totalPackets);
+
+		std::vector<uint8_t> nameField = makeNameField(fileName);
+		payload.insert(payload.end(), nameField.begin(), nameField.end());
+
+		payload.insert(payload.end(), chunk.begin(), chunk.end());
+
+		return payload;
+
+	}
 }
