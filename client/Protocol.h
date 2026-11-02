@@ -50,6 +50,8 @@ namespace Protocol
 
 	// ----- Payload field sizes -----
 	constexpr size_t NAME_SIZE = 255;	// client name and file name, null terminated
+	constexpr unsigned char PRINTABLE_ASCII_MIN = 0x20;	// space
+	constexpr unsigned char PRINTABLE_ASCII_MAX = 0x7E;	// '~'
 	constexpr size_t CONTENT_SIZE_SIZE = 4;
 	constexpr size_t ORIG_SIZE_SIZE = 4;
 	constexpr size_t PACKET_NUMBER_SIZE = 2;
@@ -72,4 +74,6 @@ namespace Protocol
 	static_assert(MAX_CLIENT_NAME_LENGTH < NAME_SIZE, "name must fit with its null terminator");
 
 	std::vector<uint8_t> buildRequest(const ClientId& clientId, RequestCode code, const std::vector<uint8_t>& payload);
+	std::vector<uint8_t> makeNameField(const std::string& name);
+	std::vector<uint8_t> makePublicKeyPayload(const std::string& name, const std::string& publicKey);
 }

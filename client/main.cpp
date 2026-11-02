@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include "Endian.h"
 #include <vector>
-#include <stdexcept>
+#include <string>
 
 void hexify(const unsigned char* buffer, unsigned int length)
 {
@@ -185,6 +185,108 @@ int protocol_test()
 	return 0;
 }
 
+
+int name_field_test()
+{
+	std::cout << std::endl << std::endl << "----- NAME FIELD TEST -----" << std::endl << std::endl;
+
+	// 1. Normal name: 255 bytes, name at the start, then zeros
+	std::vector<uint8_t> f = Protocol::makeNameField("Shimon");
+	check("size == 255", f.size() == Protocol::NAME_SIZE);
+	check("starts with 53 68 69 6D 6F 6E 00",
+		std::vector<uint8_t>(f.begin(), f.begin() + 7) == std::vector<uint8_t>{ 0x53, 0x68, 0x69, 0x6D, 0x6F, 0x6E, 0x00 });
+	check("rest is zeros", std::all_of(f.begin() + 6, f.end(), [](uint8_t b) { return b == 0; }));
+	hexify(f.data(), 16);
+
+	// 2. Boundary: 254 chars - the longest legal name; last byte must be the terminator
+	std::vector<uint8_t> f254 = Protocol::makeNameField(std::string(Protocol::NAME_SIZE - 1, 'a'));
+	check("254 chars accepted, last byte == 00", f254.size() == Protocol::NAME_SIZE && f254.back() == 0x00);
+
+	// 3. Boundary: 255 chars - no room for the terminator
+	try {
+		Protocol::makeNameField(std::string(Protocol::NAME_SIZE, 'a'));
+		check("255 chars throws length_error", false);
+	}
+	catch (const std::length_error&) {
+		check("255 chars throws length_error", true);
+	}
+
+	// 4. Empty name
+	try {
+		Protocol::makeNameField("");
+		check("empty name throws invalid_argument", false);
+	}
+	catch (const std::invalid_argument&) {
+		check("empty name throws invalid_argument", true);
+	}
+
+	// 5. Embedded \0 - the length 5 is required, otherwise the literal stops at \0
+	try {
+		Protocol::makeNameField(std::string("ab\0cd", 5));
+		check("embedded \\0 throws invalid_argument", false);
+	}
+	catch (const std::invalid_argument&) {
+		check("embedded \\0 throws invalid_argument", true);
+	}
+
+	// 6. Control character (newline)
+	try {
+		Protocol::makeNameField("ab\ncd");
+		check("newline throws invalid_argument", false);
+	}
+	catch (const std::invalid_argument&) {
+		check("newline throws invalid_argument", true);
+	}
+
+	// 7. Non-ASCII: Hebrew letter shin in UTF-8 (D7 A9), written as bytes to avoid source encoding issues
+	try {
+		Protocol::makeNameField("file_\xD7\xA9.txt");
+		check("non-ASCII throws invalid_argument", false);
+	}
+	catch (const std::invalid_argument&) {
+		check("non-ASCII throws invalid_argument", true);
+	}
+
+	return 0;
+}
+
+int public_key_payload_test()
+{
+	std::cout << std::endl << std::endl << "----- PUBLIC KEY PAYLOAD TEST -----" << std::endl << std::endl;
+
+	// A real public key from the course wrapper - exactly 160 bytes
+	RSAPrivateWrapper rsa;
+	std::string pubkey = rsa.getPublicKey();
+	std::vector<uint8_t> p = Protocol::makePublicKeyPayload("Shimon", pubkey);
+
+	check("size == 415 (255 + 160)", p.size() == Protocol::NAME_SIZE + Protocol::PUBLIC_KEY_SIZE);
+	check("name at offset 0", p[0] == 'S' && p[5] == 'n' && p[6] == 0x00);
+	check("key at offset 255",
+		std::equal(pubkey.begin(), pubkey.end(), p.begin() + Protocol::NAME_SIZE,
+			[](char a, uint8_t b) { return static_cast<uint8_t>(a) == b; }));
+
+	// Wrong key size must throw, not produce a malformed payload
+	try {
+		Protocol::makePublicKeyPayload("Shimon", std::string(100, 'x'));
+		check("short key throws length_error", false);
+	}
+	catch (const std::length_error&) {
+		check("short key throws length_error", true);
+	}
+
+	// Invalid name - the error comes from makeNameField, through this function
+	try {
+		Protocol::makePublicKeyPayload("", pubkey);
+		check("empty name throws invalid_argument", false);
+	}
+	catch (const std::invalid_argument&) {
+		check("empty name throws invalid_argument", true);
+	}
+
+	return 0;
+}
+
+
 int main()
 {
 	aes_example();
@@ -194,6 +296,10 @@ int main()
 	endian_test();
 
 	protocol_test();
+
+	name_field_test();
+
+	public_key_payload_test();
 
 	return 0;
 }
