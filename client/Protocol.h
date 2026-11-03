@@ -96,4 +96,5 @@ namespace Protocol
 		uint16_t packetNumber, uint16_t totalPackets,
 		const std::string& fileName, const std::vector<uint8_t>& chunk);
 	ResponseHeader parseResponseHeader(const std::vector<uint8_t>& header);
+	std::string parseNameField(const std::vector<uint8_t>& buffer, size_t offset);
 }

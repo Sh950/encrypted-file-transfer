@@ -137,4 +137,28 @@ namespace Protocol
 
 		return result;
 	}
+
+	// Reads a 255-byte name field from untrusted data. The terminator is searched only inside the field.
+	std::string parseNameField(const std::vector<uint8_t>& buffer, size_t offset)
+	{
+		if (offset > buffer.size() || buffer.size() - offset < NAME_SIZE)
+			throw std::out_of_range("parseNameField: buffer too short for a name field");
+
+		auto fieldBegin = buffer.begin() + offset;
+		auto fieldEnd = fieldBegin + NAME_SIZE;
+
+		auto terminator = std::find(fieldBegin, fieldEnd, 0);
+		if (terminator == fieldEnd)
+			throw std::invalid_argument("parseNameField: name field has no null terminator");
+		if (terminator == fieldBegin)
+			throw std::invalid_argument("parseNameField: name is empty");
+
+		for (auto it = fieldBegin; it != terminator; ++it)
+		{
+			if (*it < PRINTABLE_ASCII_MIN || *it > PRINTABLE_ASCII_MAX)
+				throw std::invalid_argument("parseNameField: name contains a non-printable or non-ASCII character");
+		}
+
+		return std::string(fieldBegin, terminator);
+	}
 }

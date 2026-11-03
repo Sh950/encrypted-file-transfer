@@ -358,7 +358,37 @@ int response_header_test()
 	return 0;
 }
 
+int parse_name_field_test()
+{
+	std::cout << std::endl << std::endl << "----- PARSE NAME FIELD TEST -----" << std::endl << std::endl;
 
+	std::vector<uint8_t> field = Protocol::makeNameField("file.txt");
+	check("round trip == file.txt", Protocol::parseNameField(field, 0) == "file.txt");
+
+	std::vector<uint8_t> buf(20, 0xEE);
+	buf.insert(buf.end(), field.begin(), field.end());
+	check("field at offset 20", Protocol::parseNameField(buf, 20) == "file.txt");
+
+	auto expectThrow = [&](const char* name, auto call) {
+		try { call(); check(name, false); }
+		catch (const std::exception&) { check(name, true); }
+		};
+
+	// 0 right after the field: a strlen-style read would find it, the bounded search must not.
+	std::vector<uint8_t> noTerm(Protocol::NAME_SIZE, 'a');
+	noTerm.push_back(0);
+	expectThrow("no terminator inside field throws", [&] { Protocol::parseNameField(noTerm, 0); });
+
+	expectThrow("empty name throws", [&] { Protocol::parseNameField(std::vector<uint8_t>(Protocol::NAME_SIZE, 0), 0); });
+	expectThrow("buffer too short throws", [&] { Protocol::parseNameField(std::vector<uint8_t>(100, 0), 0); });
+	expectThrow("huge offset throws", [&] { Protocol::parseNameField(field, SIZE_MAX); });
+
+	std::vector<uint8_t> bad = field;
+	bad[2] = 0x07;
+	expectThrow("control char throws", [&] { Protocol::parseNameField(bad, 0); });
+
+	return 0;
+}
 
 int main()
 {
@@ -377,6 +407,8 @@ int main()
 	file_packet_payload_test();
 
 	response_header_test();
+
+	parse_name_field_test();
 
 	return 0;
 }
