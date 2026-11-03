@@ -39,13 +39,6 @@ namespace Protocol
 		GeneralError = 1607
 	};
 
-	struct ResponseHeader
-	{
-		uint8_t      version;
-		ResponseCode code;
-		uint32_t     payloadSize;
-	};
-
 	// ----- Header field sizes -----
 	constexpr size_t CLIENT_ID_SIZE = 16;
 	using ClientId = std::array<uint8_t, CLIENT_ID_SIZE>;
@@ -89,6 +82,29 @@ namespace Protocol
 	static_assert(AES_KEY_RESPONSE_SIZE == 144, "1602/1605 payload must be 144 bytes");
 	static_assert(FILE_RECEIVED_RESPONSE_SIZE == 279, "1603 payload must be 279 bytes");
 
+	// ----- Parsed responses -----
+	struct ResponseHeader
+	{
+		uint8_t      version;
+		ResponseCode code;
+		uint32_t     payloadSize;
+	};
+
+	struct AesKeyResponse
+	{
+		ClientId clientId;
+		std::string encryptedAesKey;
+	};
+
+	struct FileReceivedResponse
+	{
+		ClientId clientId;
+		uint32_t contentSize;
+		std::string fileName;
+		uint32_t cksum;
+	};
+
+	// ----- Building requests -----
 	std::vector<uint8_t> buildRequest(const ClientId& clientId, RequestCode code, const std::vector<uint8_t>& payload);
 	std::vector<uint8_t> makeNameField(const std::string& name);
 	std::vector<uint8_t> makePublicKeyPayload(const std::string& name, const std::string& publicKey);
@@ -97,4 +113,9 @@ namespace Protocol
 		const std::string& fileName, const std::vector<uint8_t>& chunk);
 	ResponseHeader parseResponseHeader(const std::vector<uint8_t>& header);
 	std::string parseNameField(const std::vector<uint8_t>& buffer, size_t offset);
+	ClientId readClientId(const std::vector<uint8_t>& buffer, size_t offset);
+	ClientId parseClientIdPayload(const std::vector<uint8_t>& payload);
+	AesKeyResponse parseAesKeyPayload(const std::vector<uint8_t>& payload);
+	FileReceivedResponse parseFileReceivedPayload(const std::vector<uint8_t>& payload);
+
 }

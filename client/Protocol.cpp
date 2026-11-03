@@ -161,4 +161,43 @@ namespace Protocol
 
 		return std::string(fieldBegin, terminator);
 	}
+
+	ClientId readClientId(const std::vector<uint8_t>& buffer, size_t offset)
+	{
+		if (offset > buffer.size() || buffer.size() - offset < CLIENT_ID_SIZE)
+			throw std::out_of_range("readClientId: buffer too short for a client ID");
+
+		ClientId clientId{};
+		std::copy(buffer.begin() + offset, buffer.begin() + offset + CLIENT_ID_SIZE, clientId.begin());
+		return clientId;
+	}
+
+	ClientId parseClientIdPayload(const std::vector<uint8_t>& payload)
+	{
+		if (payload.size() != CLIENT_ID_RESPONSE_SIZE)
+			throw std::length_error("parseClientIdPayload: payload must be " + std::to_string(CLIENT_ID_RESPONSE_SIZE) + " bytes");
+		return readClientId(payload, 0);
+	}
+
+	AesKeyResponse parseAesKeyPayload(const std::vector<uint8_t>& payload) 
+	{
+		if (payload.size() != AES_KEY_RESPONSE_SIZE)
+			throw std::length_error("parseAesKeyPayload: payload must be " + std::to_string(AES_KEY_RESPONSE_SIZE) + " bytes");
+		AesKeyResponse response{};
+		response.clientId = readClientId(payload, 0);
+		response.encryptedAesKey = std::string(payload.begin() + CLIENT_ID_SIZE, payload.end());
+		return response;
+	}
+
+	FileReceivedResponse parseFileReceivedPayload(const std::vector<uint8_t>& payload)
+	{
+		if (payload.size() != FILE_RECEIVED_RESPONSE_SIZE)
+			throw std::length_error("parseFileReceivedPayload: payload must be " + std::to_string(FILE_RECEIVED_RESPONSE_SIZE) + " bytes");
+		FileReceivedResponse response{};
+		response.clientId = readClientId(payload, 0);
+		response.contentSize = readU32(payload, CLIENT_ID_SIZE);
+		response.fileName = parseNameField(payload, CLIENT_ID_SIZE + CONTENT_SIZE_SIZE);
+		response.cksum = readU32(payload, CLIENT_ID_SIZE + CONTENT_SIZE_SIZE + NAME_SIZE);
+		return response;
+	}
 }

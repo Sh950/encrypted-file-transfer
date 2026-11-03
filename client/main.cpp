@@ -390,6 +390,55 @@ int parse_name_field_test()
 	return 0;
 }
 
+int response_payload_test()
+{
+	std::cout << std::endl << std::endl << "----- RESPONSE PAYLOAD TEST -----" << std::endl << std::endl;
+
+	Protocol::ClientId id{};
+	for (size_t i = 0; i < id.size(); i++)
+		id[i] = static_cast<uint8_t>(0xA0 + i);
+
+	// 1600 / 1604 / 1606
+	std::vector<uint8_t> p1(id.begin(), id.end());
+	check("client ID payload parsed", Protocol::parseClientIdPayload(p1) == id);
+
+	// 1602 / 1605
+	std::vector<uint8_t> p2(id.begin(), id.end());
+	for (size_t i = 0; i < Protocol::ENCRYPTED_AES_KEY_SIZE; i++)
+		p2.push_back(static_cast<uint8_t>(i));
+	Protocol::AesKeyResponse r2 = Protocol::parseAesKeyPayload(p2);
+	check("AES payload: client ID", r2.clientId == id);
+	check("AES payload: key size 128", r2.encryptedAesKey.size() == Protocol::ENCRYPTED_AES_KEY_SIZE);
+	check("AES payload: key bytes", static_cast<uint8_t>(r2.encryptedAesKey[0]) == 0
+		&& static_cast<uint8_t>(r2.encryptedAesKey[127]) == 127);
+
+	// 1603
+	std::vector<uint8_t> p3(id.begin(), id.end());
+	appendU32(p3, 150000);
+	std::vector<uint8_t> nameField = Protocol::makeNameField("file.txt");
+	p3.insert(p3.end(), nameField.begin(), nameField.end());
+	appendU32(p3, 0x12345678);
+	Protocol::FileReceivedResponse r3 = Protocol::parseFileReceivedPayload(p3);
+	check("1603: client ID", r3.clientId == id);
+	check("1603: content size 150000", r3.contentSize == 150000);
+	check("1603: file name", r3.fileName == "file.txt");
+	check("1603: cksum 0x12345678", r3.cksum == 0x12345678);
+
+	auto expectThrow = [&](const char* name, auto call) {
+		try { call(); check(name, false); }
+		catch (const std::exception&) { check(name, true); }
+		};
+	expectThrow("client ID payload 15 bytes throws", [&] { Protocol::parseClientIdPayload(std::vector<uint8_t>(15, 0)); });
+	expectThrow("AES payload 143 bytes throws", [&] { Protocol::parseAesKeyPayload(std::vector<uint8_t>(143, 0)); });
+	expectThrow("1603 payload 280 bytes throws", [&] { Protocol::parseFileReceivedPayload(std::vector<uint8_t>(280, 0)); });
+
+	std::vector<uint8_t> p3bad = p3;
+	std::fill(p3bad.begin() + 20, p3bad.begin() + 275, 'a');
+	expectThrow("1603 name without terminator throws", [&] { Protocol::parseFileReceivedPayload(p3bad); });
+
+	return 0;
+}
+
 int main()
 {
 	aes_example();
@@ -409,6 +458,8 @@ int main()
 	response_header_test();
 
 	parse_name_field_test();
+
+	response_payload_test();
 
 	return 0;
 }
