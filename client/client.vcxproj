@@ -149,17 +149,21 @@
     <ClCompile Include="Base64Wrapper.cpp" />
     <ClCompile Include="CKsum.cpp" />
     <ClCompile Include="Endian.cpp" />
+    <ClCompile Include="FileUtils.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Protocol.cpp" />
     <ClCompile Include="RSAWrapper.cpp" />
+    <ClCompile Include="TransferConfig.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AESWrapper.h" />
     <ClInclude Include="Base64Wrapper.h" />
     <ClInclude Include="CKsum.h" />
     <ClInclude Include="Endian.h" />
+    <ClInclude Include="FileUtils.h" />
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="RSAWrapper.h" />
+    <ClInclude Include="TransferConfig.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

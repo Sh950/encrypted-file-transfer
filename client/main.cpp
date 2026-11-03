@@ -3,7 +3,10 @@
 #include "AESWrapper.h"
 #include "Protocol.h"
 #include "CKsum.h"
+#include "TransferConfig.h"
 
+#include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <iomanip>
 #include <algorithm>
@@ -454,29 +457,101 @@ int cksum_test()
 	return 0;
 }
 
+// Writes a test transfer.json to the temp directory and returns its path
+std::filesystem::path writeTestConfig(const std::string& content)
+{
+	std::filesystem::path path = std::filesystem::temp_directory_path() / "transfer_test.json";
+	std::ofstream(path, std::ios::binary) << content;
+	return path;
+}
+
+int transfer_config_test()
+{
+	std::cout << std::endl << std::endl << "----- TRANSFER CONFIG TEST -----" << std::endl << std::endl;
+
+	// 1. Standard JSON with escaped backslashes
+	TransferConfig c1 = loadTransferConfig(writeTestConfig(R"({
+		"server": { "ip": "192.168.1.5", "port": 1265, "client": "MyComputer" },
+		"files": [ "c:\\doc\\file02.docx", "c:\\openu\\defensive\\file06-2026c.pdf" ]
+	})"));
+	check("ip", c1.ip == "192.168.1.5");
+	check("port", c1.port == 1265);
+	check("client", c1.clientName == "MyComputer");
+	check("2 files", c1.files.size() == 2);
+	check("first path", c1.files[0] == std::filesystem::path("c:\\doc\\file02.docx"));
+	check("second file name", c1.files[1].filename() == "file06-2026c.pdf");
+
+	// 2. Forward slashes
+	TransferConfig c2 = loadTransferConfig(writeTestConfig(R"({
+		"server": { "ip": "127.0.0.1", "port": 1234, "client": "A" },
+		"files": [ "c:/doc/file02.docx" ]
+	})"));
+	check("forward slashes -> file02.docx", c2.files[0].filename() == "file02.docx");
+
+	// 3. Invalid configurations
+	auto expectThrow = [&](const char* name, const std::string& json) {
+		try { loadTransferConfig(writeTestConfig(json)); check(name, false); }
+		catch (const std::exception&) { check(name, true); }
+		};
+	const std::string files = R"("files": ["a.txt"])";
+
+	expectThrow("single backslashes (assignment example) rejected",
+		R"({"server": {"ip": "1.2.3.4", "port": 80, "client": "A"}, "files": ["c:\doc\file02.docx"]})");
+	expectThrow("missing port", R"({"server": {"ip": "1.2.3.4", "client": "A"}, )" + files + "}");
+	expectThrow("port 0", R"({"server": {"ip": "1.2.3.4", "port": 0, "client": "A"}, )" + files + "}");
+	expectThrow("port 70000", R"({"server": {"ip": "1.2.3.4", "port": 70000, "client": "A"}, )" + files + "}");
+	expectThrow("port as string", R"({"server": {"ip": "1.2.3.4", "port": "80", "client": "A"}, )" + files + "}");
+	expectThrow("port 80.5", R"({"server": {"ip": "1.2.3.4", "port": 80.5, "client": "A"}, )" + files + "}");
+	expectThrow("empty client", R"({"server": {"ip": "1.2.3.4", "port": 80, "client": ""}, )" + files + "}");
+	expectThrow("client 101 chars", R"({"server": {"ip": "1.2.3.4", "port": 80, "client": ")" + std::string(101, 'a') + R"("}, )" + files + "}");
+	expectThrow("empty files", R"({"server": {"ip": "1.2.3.4", "port": 80, "client": "A"}, "files": []})");
+	expectThrow("missing brace", R"({"server": {"ip": "1.2.3.4", "port": 80, "client": "A"}, )" + files);
+	expectThrow("trailing comma", R"({"server": {"ip": "1.2.3.4", "port": 80, "client": "A",}, )" + files + "}");
+
+	try {
+		loadTransferConfig(std::filesystem::temp_directory_path() / "no_such_file.json");
+		check("missing file throws", false);
+	}
+	catch (const std::exception&) {
+		check("missing file throws", true);
+	}
+
+	return 0;
+}
+
 int main()
 {
-	aes_example();
-	
-	rsa_example();
+	try
+	{
+		aes_example();
 
-	endian_test();
+		rsa_example();
 
-	protocol_test();
+		endian_test();
 
-	name_field_test();
+		protocol_test();
 
-	public_key_payload_test();
+		name_field_test();
 
-	file_packet_payload_test();
+		public_key_payload_test();
 
-	response_header_test();
+		file_packet_payload_test();
 
-	parse_name_field_test();
+		response_header_test();
 
-	response_payload_test();
+		parse_name_field_test();
 
-	cksum_test();
+		response_payload_test();
 
+		cksum_test();
+
+		transfer_config_test();
+	}
+
+	catch (const std::exception& e)
+	{
+		std::cout << std::endl << "UNCAUGHT EXCEPTION: " << e.what() << std::endl;
+		return 1;
+	}
 	return 0;
 }
