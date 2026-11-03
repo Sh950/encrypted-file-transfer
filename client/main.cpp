@@ -317,6 +317,47 @@ int file_packet_payload_test()
 	return 0;
 }
 
+std::vector<uint8_t> makeTestHeader(uint8_t version, uint16_t code, uint32_t size)
+{
+	std::vector<uint8_t> h;
+	h.push_back(version);
+	appendU16(h, code);
+	appendU32(h, size);
+	return h;
+}
+
+int response_header_test()
+{
+	std::cout << std::endl << std::endl << "----- RESPONSE HEADER TEST -----" << std::endl << std::endl;
+
+	// Valid headers
+	Protocol::ResponseHeader h1 = Protocol::parseResponseHeader(makeTestHeader(3, 1600, 16));
+	check("1600 parsed: version 3, code RegisterOk, size 16",
+		h1.version == 3 && h1.code == Protocol::ResponseCode::RegisterOk && h1.payloadSize == 16);
+
+	Protocol::ResponseHeader h2 = Protocol::parseResponseHeader(makeTestHeader(3, 1603, 279));
+	check("1603 parsed with size 279", h2.code == Protocol::ResponseCode::FileReceived && h2.payloadSize == 279);
+
+	Protocol::ResponseHeader h3 = Protocol::parseResponseHeader(makeTestHeader(3, 1607, 0));
+	check("1607 parsed with size 0", h3.code == Protocol::ResponseCode::GeneralError && h3.payloadSize == 0);
+
+	// Invalid headers
+	auto expectThrow = [&](const char* name, auto call) {
+		try { call(); check(name, false); }
+		catch (const std::exception&) { check(name, true); }
+		};
+	expectThrow("6-byte header throws", [&] { Protocol::parseResponseHeader({ 3, 0x40, 0x06, 16, 0, 0 }); });
+	expectThrow("version 2 throws", [&] { Protocol::parseResponseHeader(makeTestHeader(2, 1600, 16)); });
+	expectThrow("version 4 throws", [&] { Protocol::parseResponseHeader(makeTestHeader(4, 1600, 16)); });
+	expectThrow("code 1599 throws", [&] { Protocol::parseResponseHeader(makeTestHeader(3, 1599, 0)); });
+	expectThrow("code 1608 throws", [&] { Protocol::parseResponseHeader(makeTestHeader(3, 1608, 0)); });
+	expectThrow("1600 with size 17 throws", [&] { Protocol::parseResponseHeader(makeTestHeader(3, 1600, 17)); });
+	expectThrow("1601 with size 1 throws", [&] { Protocol::parseResponseHeader(makeTestHeader(3, 1601, 1)); });
+	expectThrow("size 0xFFFFFFFF throws", [&] { Protocol::parseResponseHeader(makeTestHeader(3, 1602, 0xFFFFFFFF)); });
+
+	return 0;
+}
+
 
 
 int main()
@@ -334,6 +375,8 @@ int main()
 	public_key_payload_test();
 
 	file_packet_payload_test();
+
+	response_header_test();
 
 	return 0;
 }

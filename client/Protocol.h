@@ -12,6 +12,7 @@ namespace Protocol
 {
 	// ----- Version -----
 	constexpr uint8_t CLIENT_VERSION = 3;
+	constexpr uint8_t SERVER_VERSION = 3;
 
 	// ----- Request codes (client -> server) -----
 	enum class RequestCode : uint16_t
@@ -36,6 +37,13 @@ namespace Protocol
 		ReconnectOk = 1605,
 		ReconnectDenied = 1606,
 		GeneralError = 1607
+	};
+
+	struct ResponseHeader
+	{
+		uint8_t      version;
+		ResponseCode code;
+		uint32_t     payloadSize;
 	};
 
 	// ----- Header field sizes -----
@@ -63,6 +71,10 @@ namespace Protocol
 	constexpr size_t AES_KEY_SIZE = AESWrapper::DEFAULT_KEYLENGTH;
 	constexpr size_t PUBLIC_KEY_SIZE = RSAPublicWrapper::KEYSIZE;
 	constexpr size_t ENCRYPTED_AES_KEY_SIZE = RSAPrivateWrapper::BITS / 8;	// RSA output length = key length
+	constexpr size_t CLIENT_ID_RESPONSE_SIZE = CLIENT_ID_SIZE;                                           // 1600, 1604, 1606
+	constexpr size_t AES_KEY_RESPONSE_SIZE = CLIENT_ID_SIZE + ENCRYPTED_AES_KEY_SIZE;                  // 1602, 1605
+	constexpr size_t FILE_RECEIVED_RESPONSE_SIZE = CLIENT_ID_SIZE + CONTENT_SIZE_SIZE + NAME_SIZE + CKSUM_SIZE; // 1603
+	constexpr size_t EMPTY_RESPONSE_SIZE = 0;
 
 	// ----- Limits from the assignment text -----
 	constexpr int    MAX_FILE_SEND_ATTEMPTS = 4;	// first send + 3 resends, then 902
@@ -74,6 +86,8 @@ namespace Protocol
 	static_assert(RESPONSE_HEADER_SIZE == 7, "response header must be 7 bytes");
 	static_assert(MAX_CLIENT_NAME_LENGTH < NAME_SIZE, "name must fit with its null terminator");
 	static_assert(FILE_PACKET_HEADER_SIZE == 267, "828 fixed part must be 267 bytes");
+	static_assert(AES_KEY_RESPONSE_SIZE == 144, "1602/1605 payload must be 144 bytes");
+	static_assert(FILE_RECEIVED_RESPONSE_SIZE == 279, "1603 payload must be 279 bytes");
 
 	std::vector<uint8_t> buildRequest(const ClientId& clientId, RequestCode code, const std::vector<uint8_t>& payload);
 	std::vector<uint8_t> makeNameField(const std::string& name);
@@ -81,4 +95,5 @@ namespace Protocol
 	std::vector<uint8_t> makeFilePacketPayload(uint32_t contentSize, uint32_t origSize,
 		uint16_t packetNumber, uint16_t totalPackets,
 		const std::string& fileName, const std::vector<uint8_t>& chunk);
+	ResponseHeader parseResponseHeader(const std::vector<uint8_t>& header);
 }

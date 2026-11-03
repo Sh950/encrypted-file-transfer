@@ -81,6 +81,60 @@ namespace Protocol
 		payload.insert(payload.end(), chunk.begin(), chunk.end());
 
 		return payload;
+	}
 
+	size_t expectedPayloadSize(ResponseCode code)
+	{
+		switch (code)
+		{
+		case ResponseCode::RegisterOk:
+		case ResponseCode::Ack:
+		case ResponseCode::ReconnectDenied:
+			return CLIENT_ID_RESPONSE_SIZE;
+
+		case ResponseCode::AesKey:
+		case ResponseCode::ReconnectOk:
+			return AES_KEY_RESPONSE_SIZE;
+
+		case ResponseCode::FileReceived:
+			return FILE_RECEIVED_RESPONSE_SIZE;
+
+		case ResponseCode::RegisterFailed:
+		case ResponseCode::GeneralError:
+			return EMPTY_RESPONSE_SIZE;
+
+		default:
+			throw std::invalid_argument("expectedPayloadSize: unknown response code");
+		}
+	}
+
+	// Validates the header before the payload is read: all fields come from the network.
+	ResponseHeader parseResponseHeader(const std::vector<uint8_t>& header)
+	{
+		if (header.size() != RESPONSE_HEADER_SIZE)
+			throw std::length_error("parseResponseHeader: header must be " + std::to_string(RESPONSE_HEADER_SIZE) + " bytes");
+
+		ResponseHeader result{};
+
+		// The assignment fixes the server version at 3, any other version violates the protocol.
+		result.version = header[0];
+		if (result.version != SERVER_VERSION)
+			throw std::invalid_argument("parseResponseHeader: unsupported server version " + std::to_string(result.version));
+
+		// Cast to the enum only after checking the code is known.
+		const uint16_t rawCode = readU16(header, VERSION_SIZE);
+		const uint16_t firstCode = static_cast<uint16_t>(ResponseCode::RegisterOk);
+		const uint16_t lastCode = static_cast<uint16_t>(ResponseCode::GeneralError);
+		if (rawCode < firstCode || rawCode > lastCode)
+			throw std::invalid_argument("parseResponseHeader: unknown response code " + std::to_string(rawCode));
+		result.code = static_cast<ResponseCode>(rawCode);
+
+		// Exact size per code, checked before any allocation (prevents a huge size from exhausting memory).
+		result.payloadSize = readU32(header, VERSION_SIZE + CODE_SIZE);
+		if (result.payloadSize != expectedPayloadSize(result.code))
+			throw std::length_error("parseResponseHeader: payload size " + std::to_string(result.payloadSize)
+				+ " does not match code " + std::to_string(rawCode));
+
+		return result;
 	}
 }
