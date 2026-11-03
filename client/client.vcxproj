@@ -147,6 +147,7 @@
   <ItemGroup>
     <ClCompile Include="AESWrapper.cpp" />
     <ClCompile Include="Base64Wrapper.cpp" />
+    <ClCompile Include="CKsum.cpp" />
     <ClCompile Include="Endian.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Protocol.cpp" />
@@ -155,6 +156,7 @@
   <ItemGroup>
     <ClInclude Include="AESWrapper.h" />
     <ClInclude Include="Base64Wrapper.h" />
+    <ClInclude Include="CKsum.h" />
     <ClInclude Include="Endian.h" />
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="RSAWrapper.h" />

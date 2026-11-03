@@ -2,6 +2,7 @@
 #include "RSAWrapper.h"
 #include "AESWrapper.h"
 #include "Protocol.h"
+#include "CKsum.h"
 
 #include <iostream>
 #include <iomanip>
@@ -439,6 +440,20 @@ int response_payload_test()
 	return 0;
 }
 
+int cksum_test()
+{
+	std::cout << std::endl << std::endl << "----- CKSUM TEST -----" << std::endl << std::endl;
+
+	// Expected values from Linux: printf '' | cksum ; printf a | cksum ; printf 123456789 | cksum
+	check("empty == 4294967295", Cksum::computeCksum({}) == 4294967295u);
+	check("\"a\" == 1220704766", Cksum::computeCksum({ 'a' }) == 1220704766u);
+
+	std::string s = "123456789";
+	check("\"123456789\" == 930766865", Cksum::computeCksum(std::vector<uint8_t>(s.begin(), s.end())) == 930766865u);
+
+	return 0;
+}
+
 int main()
 {
 	aes_example();
@@ -460,6 +475,8 @@ int main()
 	parse_name_field_test();
 
 	response_payload_test();
+
+	cksum_test();
 
 	return 0;
 }
