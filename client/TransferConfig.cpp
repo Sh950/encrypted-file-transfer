@@ -13,17 +13,6 @@ namespace
 	constexpr int64_t        MIN_PORT = 1;
 	constexpr int64_t        MAX_PORT = std::numeric_limits<uint16_t>::max();
 
-	bool isPrintableAscii(const std::string& text)
-	{
-		for (char c : text)
-		{
-			const unsigned char uc = static_cast<unsigned char>(c);
-			if (uc < Protocol::PRINTABLE_ASCII_MIN || uc > Protocol::PRINTABLE_ASCII_MAX)
-				return false;
-		}
-		return true;
-	}
-
 	std::string getString(const nlohmann::json& object, const char* key)
 	{
 		if (!object.contains(key) || !object.at(key).is_string())
@@ -54,7 +43,7 @@ TransferConfig loadTransferConfig(const std::filesystem::path& path)
 	TransferConfig config{};
 
 	config.ip = getString(server, "ip");
-	if (config.ip.empty() || config.ip.size() > MAX_IP_LENGTH || !isPrintableAscii(config.ip))
+	if (config.ip.empty() || config.ip.size() > MAX_IP_LENGTH || !Protocol::isPrintableAscii(config.ip))
 		throw std::runtime_error("transfer.json: invalid \"ip\"");
 
 	if (!server.contains("port") || !server.at("port").is_number_integer())
@@ -65,8 +54,7 @@ TransferConfig loadTransferConfig(const std::filesystem::path& path)
 	config.port = static_cast<uint16_t>(port);
 
 	config.clientName = getString(server, "client");
-	if (config.clientName.empty() || config.clientName.size() > Protocol::MAX_CLIENT_NAME_LENGTH
-		|| !isPrintableAscii(config.clientName))
+	if (!Protocol::isValidClientName(config.clientName))
 		throw std::runtime_error("transfer.json: \"client\" must be 1-100 printable ASCII characters");
 
 	if (!root.contains("files") || !root.at("files").is_array() || root.at("files").empty())
@@ -76,7 +64,7 @@ TransferConfig loadTransferConfig(const std::filesystem::path& path)
 		if (!file.is_string() || file.get<std::string>().empty())
 			throw std::runtime_error("transfer.json: every entry in \"files\" must be a non-empty string");
 		const std::string pathText = file.get<std::string>();
-		// UTF-8 so that non-ASCII directory names (e.g. Hebrew) are decoded correctly on Windows
+		// UTF-8 so that non-ASCII directory names are decoded correctly on Windows
 		config.files.emplace_back(std::u8string(pathText.begin(), pathText.end()));
 	}
 

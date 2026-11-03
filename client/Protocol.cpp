@@ -200,4 +200,20 @@ namespace Protocol
 		response.cksum = readU32(payload, CLIENT_ID_SIZE + CONTENT_SIZE_SIZE + NAME_SIZE);
 		return response;
 	}
+
+	bool isPrintableAscii(const std::string& text)
+	{
+		for (char c : text)
+		{
+			const unsigned char uc = static_cast<unsigned char>(c);
+			if (uc < PRINTABLE_ASCII_MIN || uc > PRINTABLE_ASCII_MAX)
+				return false;
+		}
+		return true;
+	}
+
+	bool isValidClientName(const std::string& name)
+	{
+		return !name.empty() && name.size() <= MAX_CLIENT_NAME_LENGTH && isPrintableAscii(name);
+	}
 }

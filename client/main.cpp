@@ -4,6 +4,9 @@
 #include "Protocol.h"
 #include "CKsum.h"
 #include "TransferConfig.h"
+#include "ClientIdentity.h"
+#include "FileUtils.h"
+#include "Base64Wrapper.h"
 
 #include <fstream>
 #include <filesystem>
@@ -519,6 +522,84 @@ int transfer_config_test()
 	return 0;
 }
 
+int identity_test()
+{
+	std::cout << std::endl << std::endl << "----- CLIENT IDENTITY TEST -----" << std::endl << std::endl;
+
+	namespace fs = std::filesystem;
+	const fs::path dir = fs::temp_directory_path() / "identity_test";
+	fs::remove_all(dir);
+	fs::create_directories(dir);
+
+	auto writeText = [](const fs::path& path, const std::string& content) {
+		std::ofstream(path, std::ios::binary) << content;
+		};
+
+	// 1. No files: a new client
+	check("empty directory -> no identity", !loadIdentity(dir).has_value());
+
+	// 2. Save, then load: the round trip must return exactly what was saved
+	RSAPrivateWrapper rsa;
+	const Protocol::ClientId id{ 0x64, 0xf3, 0xf6, 0x39, 0x85, 0xf0, 0x4b, 0xeb,
+								 0x81, 0xa0, 0xe4, 0x33, 0x21, 0x88, 0x01, 0x82 };
+	const ClientIdentity original{ "Shimon", id, rsa.getPrivateKey() };
+	saveIdentity(dir, original);
+
+	const std::optional<ClientIdentity> loaded = loadIdentity(dir);
+	check("round trip: loaded", loaded.has_value());
+	check("round trip: name", loaded && loaded->name == original.name);
+	check("round trip: id", loaded && loaded->id == original.id);
+	check("round trip: private key", loaded && loaded->privateKey == original.privateKey);
+
+	const std::string meInfo = FileUtils::readTextFile(dir / "me.info", 4096);
+	check("me.info line 2 is the hex UUID", meInfo.find("\n64f3f63985f04beb81a0e43321880182\n") != std::string::npos);
+
+	// 3. Files edited by hand: Windows line endings and uppercase hex are accepted
+	const std::string key = Base64Wrapper::encode(original.privateKey);
+	writeText(dir / "me.info", "Shimon\r\n64F3F63985F04BEB81A0E43321880182\r\n" + key + "\r\n");
+	writeText(dir / "priv.key", key + "\r\n");
+	check("CRLF and uppercase hex accepted", loadIdentity(dir).has_value());
+
+	// 4. Corrupted files must throw, never return a half-valid identity
+	auto expectCorrupted = [&](const char* name, const std::string& meInfoContent, const std::string& privKeyContent) {
+		writeText(dir / "me.info", meInfoContent);
+		writeText(dir / "priv.key", privKeyContent);
+		try { loadIdentity(dir); check(name, false); }
+		catch (const std::exception&) { check(name, true); }
+		};
+	const std::string goodHex = "64f3f63985f04beb81a0e43321880182";
+
+	expectCorrupted("only 2 lines", "Shimon\n" + goodHex + "\n", key);
+	expectCorrupted("extra empty line", "Shimon\n" + goodHex + "\n" + key + "\n\n", key);
+	expectCorrupted("name too long", std::string(101, 'a') + "\n" + goodHex + "\n" + key, key);
+	expectCorrupted("UUID 31 chars", "Shimon\n" + goodHex.substr(1) + "\n" + key, key);
+	expectCorrupted("UUID with 'g'", "Shimon\ng" + goodHex.substr(1) + "\n" + key, key);
+	expectCorrupted("priv.key differs", "Shimon\n" + goodHex + "\n" + key, key + "AAAA");
+	expectCorrupted("key is not RSA", "Shimon\n" + goodHex + "\nAAAAAAAAAAAA", "AAAAAAAAAAAA");
+
+	writeText(dir / "me.info", "Shimon\n" + goodHex + "\n" + key);
+	fs::remove(dir / "priv.key");
+	try { loadIdentity(dir); check("priv.key missing", false); }
+	catch (const std::exception&) { check("priv.key missing", true); }
+
+	// 5. Delete: afterwards the client is new again
+	saveIdentity(dir, original);
+	deleteIdentity(dir);
+	check("after delete -> no identity", !loadIdentity(dir).has_value());
+	check("after delete -> files gone", !fs::exists(dir / "me.info") && !fs::exists(dir / "priv.key"));
+
+	// 6. Leftover priv.key without me.info: still a new client
+	writeText(dir / "priv.key", key);
+	check("priv.key without me.info -> no identity", !loadIdentity(dir).has_value());
+
+	// 7. saveIdentity refuses to write files that loadIdentity would reject
+	try { saveIdentity(dir, ClientIdentity{ "", id, original.privateKey }); check("save with empty name throws", false); }
+	catch (const std::exception&) { check("save with empty name throws", true); }
+
+	fs::remove_all(dir);
+	return 0;
+}
+
 int main()
 {
 	try
@@ -546,6 +627,8 @@ int main()
 		cksum_test();
 
 		transfer_config_test();
+
+		identity_test();
 	}
 
 	catch (const std::exception& e)

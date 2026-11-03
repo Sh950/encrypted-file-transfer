@@ -118,4 +118,8 @@ namespace Protocol
 	AesKeyResponse parseAesKeyPayload(const std::vector<uint8_t>& payload);
 	FileReceivedResponse parseFileReceivedPayload(const std::vector<uint8_t>& payload);
 
+	// ----- Validation -----
+	bool isPrintableAscii(const std::string& text);
+	bool isValidClientName(const std::string& name);
+
 }
