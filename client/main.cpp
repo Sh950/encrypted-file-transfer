@@ -6,7 +6,7 @@
 #include "TransferConfig.h"
 #include "ClientIdentity.h"
 #include "FileUtils.h"
-#include "Base64Wrapper.h"
+#include "TcpConnection.h"
 
 #include <fstream>
 #include <filesystem>
@@ -17,6 +17,7 @@
 #include "Endian.h"
 #include <vector>
 #include <string>
+#include <chrono>
 
 void hexify(const unsigned char* buffer, unsigned int length)
 {
@@ -600,10 +601,63 @@ int identity_test()
 	return 0;
 }
 
+int tcp_test()
+{
+	std::cout << std::endl << std::endl << "----- TCP TEST (needs tools\\echo_server.py on port 1234) -----" << std::endl << std::endl;
+	using namespace std::chrono_literals;
+
+	auto expectThrow = [&](const char* name, auto call) {
+		try { call(); check(name, false); }
+		catch (const std::exception& e) { check(name, true); std::cout << "       " << e.what() << std::endl; }
+		};
+
+	// 1. Failures that need no server
+	expectThrow("invalid timeout 0", [] { TcpConnection c("127.0.0.1", 1234, 0ms); });
+	expectThrow("no server on port 1", [] { TcpConnection c("127.0.0.1", 1, 2s); });
+	expectThrow("unresolvable host", [] { TcpConnection c("no.such.host.invalid", 1234, 2s); });
+
+	// 2. Small echo
+	{
+		TcpConnection connection("127.0.0.1", 1234, 5s);
+		const std::vector<uint8_t> message{ 0x01, 0x02, 0x03, 0xFE, 0xFF };
+		connection.sendAll(message);
+		check("echo 5 bytes", connection.recvExact(message.size()) == message);
+		check("recvExact(0) returns empty", connection.recvExact(0).empty());
+	}
+
+	// 3. 1 MB in 64 KB rounds: every byte must come back, in order
+	{
+		TcpConnection connection("127.0.0.1", 1234, 5s);
+		constexpr size_t ROUND_SIZE = 64 * 1024;
+		constexpr size_t ROUNDS = 16;
+		bool allEqual = true;
+		for (size_t round = 0; round < ROUNDS; ++round)
+		{
+			std::vector<uint8_t> chunk(ROUND_SIZE);
+			for (size_t i = 0; i < chunk.size(); ++i)
+				chunk[i] = static_cast<uint8_t>((round * ROUND_SIZE + i) % 251);	// non-repeating pattern per round
+			connection.sendAll(chunk);
+			if (connection.recvExact(chunk.size()) != chunk)
+				allEqual = false;
+		}
+		check("echo 1 MB in 16 rounds", allEqual);
+	}
+
+	// 4. Timeout: nothing was sent, so nothing comes back
+	{
+		TcpConnection connection("127.0.0.1", 1234, 500ms);
+		expectThrow("recv timeout", [&] { connection.recvExact(1); });
+	}
+
+	return 0;
+}
+
 int main()
 {
 	try
 	{
+		WinsockSession winsock;
+
 		aes_example();
 
 		rsa_example();
@@ -629,6 +683,8 @@ int main()
 		transfer_config_test();
 
 		identity_test();
+
+		tcp_test();
 	}
 
 	catch (const std::exception& e)

@@ -45,6 +45,9 @@
     <ClCompile Include="ClientIdentity.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TcpConnection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AESWrapper.h">
@@ -75,6 +78,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ClientIdentity.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TcpConnection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

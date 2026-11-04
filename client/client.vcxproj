@@ -154,6 +154,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Protocol.cpp" />
     <ClCompile Include="RSAWrapper.cpp" />
+    <ClCompile Include="TcpConnection.cpp" />
     <ClCompile Include="TransferConfig.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -166,6 +167,7 @@
     <ClInclude Include="nlohmann\json.hpp" />
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="RSAWrapper.h" />
+    <ClInclude Include="TcpConnection.h" />
     <ClInclude Include="TransferConfig.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
