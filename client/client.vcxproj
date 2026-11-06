@@ -148,10 +148,12 @@
     <ClCompile Include="AESWrapper.cpp" />
     <ClCompile Include="Base64Wrapper.cpp" />
     <ClCompile Include="CKsum.cpp" />
+    <ClCompile Include="Client.cpp" />
     <ClCompile Include="ClientIdentity.cpp" />
     <ClCompile Include="Endian.cpp" />
     <ClCompile Include="FileUtils.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="SelfTests.cpp" />
     <ClCompile Include="Protocol.cpp" />
     <ClCompile Include="RSAWrapper.cpp" />
     <ClCompile Include="TcpConnection.cpp" />
@@ -161,12 +163,14 @@
     <ClInclude Include="AESWrapper.h" />
     <ClInclude Include="Base64Wrapper.h" />
     <ClInclude Include="CKsum.h" />
+    <ClInclude Include="Client.h" />
     <ClInclude Include="ClientIdentity.h" />
     <ClInclude Include="Endian.h" />
     <ClInclude Include="FileUtils.h" />
     <ClInclude Include="nlohmann\json.hpp" />
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="RSAWrapper.h" />
+    <ClInclude Include="SelfTests.h" />
     <ClInclude Include="TcpConnection.h" />
     <ClInclude Include="TransferConfig.h" />
   </ItemGroup>

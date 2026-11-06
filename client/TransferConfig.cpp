@@ -24,6 +24,9 @@ namespace
 // Assumes standard JSON: Windows paths must be written with \\ or /.
 TransferConfig loadTransferConfig(const std::filesystem::path& path)
 {
+	if (!std::filesystem::exists(path))
+		throw std::runtime_error("transfer.json not found next to client.exe");
+
 	const std::string text = FileUtils::readTextFile(path, MAX_CONFIG_FILE_SIZE);
 
 	nlohmann::json root;
