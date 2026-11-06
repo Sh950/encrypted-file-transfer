@@ -38,6 +38,10 @@ bool Client::run()
 		log("no me.info - will register as a new client");
 
 	connect();
+
+	if (!identity_)
+		registerNew();
+
 	return true;
 }
 
