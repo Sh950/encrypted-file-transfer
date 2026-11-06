@@ -1,6 +1,7 @@
 #include "Client.h"
 #include "RSAWrapper.h"
 
+#include <cryptlib.h>
 #include <chrono>
 #include <stdexcept>
 #include <iostream>
@@ -40,7 +41,10 @@ bool Client::run()
 	connect();
 
 	if (!identity_)
+	{
 		registerNew();
+		sendPublicKey();
+	}
 
 	return true;
 }
@@ -116,4 +120,39 @@ Client::Response Client::exchange(Protocol::RequestCode code, const std::vector<
 
 	throw std::runtime_error("server responded with an error " + std::to_string(Protocol::MAX_SERVER_ERROR_RETRIES)
 		+ " times to request " + codeText(static_cast<uint16_t>(code)) + " (last response " + codeText(lastCode) + ")");
+}
+
+void Client::sendPublicKey()
+{
+	const RSAPrivateWrapper rsa(identity_->privateKey);
+	log("sending public key");
+	const Response response = exchange(Protocol::RequestCode::SendPublicKey,
+		Protocol::makePublicKeyPayload(identity_->name, rsa.getPublicKey()), { Protocol::ResponseCode::AesKey });
+	setAesKeyFromResponse(response);
+}
+
+// 1602 and 1605 carry the same payload: the client ID and the AES key encrypted with our public key
+void Client::setAesKeyFromResponse(const Response& response)
+{
+	const Protocol::AesKeyResponse parsed = Protocol::parseAesKeyPayload(response.payload);
+	if (parsed.clientId != identity_->id)
+		throw std::runtime_error("the server sent an AES key for a different client ID");
+
+	RSAPrivateWrapper rsa(identity_->privateKey);
+	std::string aesKey;
+	try
+	{
+		aesKey = rsa.decrypt(parsed.encryptedAesKey);
+	}
+	catch (const CryptoPP::Exception&)
+	{
+		throw std::runtime_error("cannot decrypt the AES key - it was not encrypted with this client's public key");
+	}
+
+	if (aesKey.size() != Protocol::AES_KEY_SIZE)
+		throw std::runtime_error("the decrypted AES key is " + std::to_string(aesKey.size())
+			+ " bytes, expected " + std::to_string(Protocol::AES_KEY_SIZE));
+
+	aesKey_.assign(aesKey.begin(), aesKey.end());
+	log("key exchange complete");
 }

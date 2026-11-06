@@ -36,10 +36,13 @@ private:
 	Response exchange(Protocol::RequestCode code, const std::vector<uint8_t>& payload,
 		std::initializer_list<Protocol::ResponseCode> expected);
 	Protocol::ClientId currentClientId() const;
+	void registerNew();
+	void sendPublicKey();
+	void setAesKeyFromResponse(const Response& response);
 
 	TransferConfig config_;
 	std::optional<ClientIdentity> identity_;
 	std::filesystem::path directory_;
 	std::optional<TcpConnection> connection_;
-	void registerNew();
+	std::vector<uint8_t> aesKey_;	// received from the server; empty until the key exchange
 };

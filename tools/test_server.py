@@ -2,12 +2,17 @@
 import socket
 import struct
 import uuid
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.PublicKey import RSA
+from Crypto.Random import get_random_bytes
 
 HOST, PORT = "127.0.0.1", 1234
 SERVER_VERSION = 3
 REQUEST_HEADER = struct.Struct("<16sBHI")   # client id, version, code, payload size
 RESPONSE_HEADER = struct.Struct("<BHI")     # version, code, payload size
 NAME_SIZE = 255
+PUBLIC_KEY_SIZE = 160
+AES_KEY_SIZE = 32
 
 clients = {}   # name -> client id (16 bytes), kept while the server runs
 
@@ -30,6 +35,19 @@ def send_response(conn, code, payload=b""):
 def parse_name(field):
     return field.split(b"\0", 1)[0].decode("ascii")
 
+def handle_public_key(conn, client_id, payload):
+    name = parse_name(payload[:NAME_SIZE])
+    public_key = payload[NAME_SIZE:NAME_SIZE + PUBLIC_KEY_SIZE]
+    entry = clients.get(name)
+    if entry is None or entry["id"] != client_id:
+        print(f"[server] unknown client '{name}' or client ID mismatch")
+        send_response(conn, 1607)
+        return
+    aes_key = get_random_bytes(AES_KEY_SIZE)
+    encrypted = PKCS1_OAEP.new(RSA.import_key(public_key)).encrypt(aes_key)
+    entry["aes_key"] = aes_key
+    print(f"[server] '{name}': AES key created, encrypted with the client's public key ({len(encrypted)} bytes)")
+    send_response(conn, 1602, client_id + encrypted)
 
 def handle_register(conn, client_id, payload):
     name = parse_name(payload[:NAME_SIZE])
@@ -38,13 +56,11 @@ def handle_register(conn, client_id, payload):
         send_response(conn, 1601)
         return
     new_id = uuid.uuid4().bytes
-    clients[name] = new_id
+    clients[name] = {"id": new_id, "aes_key": None}
     print(f"[server] registered '{name}' as {new_id.hex()}")
     send_response(conn, 1600, new_id)
 
-
-HANDLERS = {825: handle_register}
-
+HANDLERS = {825: handle_register, 826: handle_public_key}
 
 def serve(conn):
     while True:
