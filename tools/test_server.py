@@ -2,7 +2,10 @@
 import socket
 import struct
 import uuid
-from Crypto.Cipher import PKCS1_OAEP
+import os
+from Crypto.Util.Padding import unpad
+from cksum import memcrc
+from Crypto.Cipher import PKCS1_OAEP, AES
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 
@@ -13,9 +16,11 @@ RESPONSE_HEADER = struct.Struct("<BHI")     # version, code, payload size
 NAME_SIZE = 255
 PUBLIC_KEY_SIZE = 160
 AES_KEY_SIZE = 32
+FILE_PACKET_HEADER = struct.Struct("<IIHH")   # content size, orig size, packet number, total packets
+RECEIVED_DIR = os.path.join(os.path.dirname(__file__), "received")
+transfers = {}   # (client id, file name) -> list of encrypted chunks
 
-clients = {}   # name -> client id (16 bytes), kept while the server runs
-
+clients = {}   # name -> {"id", "public_key", "aes_key"}, kept only while the server runs
 
 def recv_exact(conn, size):
     data = b""
@@ -74,7 +79,57 @@ def handle_reconnect(conn, client_id, payload):
     print(f"[server] '{name}' reconnected: new AES key, encrypted with the stored public key")
     send_response(conn, 1605, client_id + encrypted)
 
-HANDLERS = {825: handle_register, 826: handle_public_key, 827: handle_reconnect}
+def find_client(client_id):
+    for name, entry in clients.items():
+        if entry["id"] == client_id:
+            return name, entry
+    return None, None
+
+def name_field(name):
+    return name.encode("ascii").ljust(NAME_SIZE, b"\0")
+
+def handle_file_packet(conn, client_id, payload):
+    content_size, orig_size, packet, total = FILE_PACKET_HEADER.unpack(payload[:FILE_PACKET_HEADER.size])
+    offset = FILE_PACKET_HEADER.size
+    file_name = parse_name(payload[offset:offset + NAME_SIZE])
+    chunk = payload[offset + NAME_SIZE:]
+    name, entry = find_client(client_id)
+    if entry is None or entry["aes_key"] is None:
+        send_response(conn, 1607)
+        return
+
+    key = (client_id, file_name)
+    if packet == 1:
+        transfers[key] = []
+    transfers[key].append(chunk)
+    if packet < total:
+        return   # no answer until the last packet
+
+    encrypted = b"".join(transfers.pop(key))
+    content = unpad(AES.new(entry["aes_key"], AES.MODE_CBC, iv=bytes(16)).decrypt(encrypted), 16)
+    crc = memcrc(content)
+    os.makedirs(RECEIVED_DIR, exist_ok=True)
+    with open(os.path.join(RECEIVED_DIR, file_name), "wb") as f:
+        f.write(content)
+    print(f"[server] '{name}': received {file_name}: {total} packet(s), {len(content)} bytes, CRC {crc}")
+    send_response(conn, 1603, client_id + struct.pack("<I", len(encrypted)) + name_field(file_name) + struct.pack("<I", crc))
+
+
+def handle_crc_ok(conn, client_id, payload):
+    print(f"[server] CRC OK for {parse_name(payload[:NAME_SIZE])}")
+    send_response(conn, 1604, client_id)
+
+
+def handle_crc_retry(conn, client_id, payload):
+    print(f"[server] CRC mismatch for {parse_name(payload[:NAME_SIZE])} - client will resend")
+
+
+def handle_crc_abort(conn, client_id, payload):
+    print(f"[server] CRC failed 4 times for {parse_name(payload[:NAME_SIZE])} - client gave up")
+    send_response(conn, 1604, client_id)
+
+HANDLERS = {825: handle_register, 826: handle_public_key, 827: handle_reconnect,
+            828: handle_file_packet, 900: handle_crc_ok, 901: handle_crc_retry, 902: handle_crc_abort}
 
 def serve(conn):
     while True:

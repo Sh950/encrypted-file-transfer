@@ -17,3 +17,5 @@ me.info
 priv.key
 defensive.db
 server/storage/
+testdata/
+tools/received/

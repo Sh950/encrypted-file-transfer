@@ -51,4 +51,23 @@ namespace FileUtils
 			throw std::runtime_error("readTextFile: read failed");
 		return text;
 	}
+
+	std::vector<uint8_t> readBinaryFile(const std::filesystem::path& path, std::uintmax_t maxSize)
+	{
+		std::error_code error;
+		const std::uintmax_t size = std::filesystem::file_size(path, error);
+		if (error)
+			throw std::runtime_error("readBinaryFile: cannot read file size");
+		if (size > maxSize)
+			throw std::length_error("readBinaryFile: file too large");
+
+		std::ifstream in(path, std::ios::binary);
+		if (!in)
+			throw std::runtime_error("readBinaryFile: cannot open file");
+
+		std::vector<uint8_t> data(static_cast<size_t>(size));
+		if (size > 0 && !in.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(size)))
+			throw std::runtime_error("readBinaryFile: read failed");
+		return data;
+	}
 }
