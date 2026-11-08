@@ -17,8 +17,8 @@ class Client
 {
 public:
 	enum class FileResult { Verified, CrcFailed, Skipped };
-
 	Client(TransferConfig config, std::optional<ClientIdentity> identity, std::filesystem::path directory);
+	~Client();
 	Client(const Client&) = delete;
 	Client& operator=(const Client&) = delete;
 

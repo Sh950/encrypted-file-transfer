@@ -5,7 +5,7 @@
 #include "RSAWrapper.h"
 
 #include <cryptlib.h>
-
+#include <misc.h>
 #include <algorithm>
 #include <chrono>
 #include <iostream>
@@ -47,6 +47,15 @@ namespace
 Client::Client(TransferConfig config, std::optional<ClientIdentity> identity, std::filesystem::path directory)
 	: config_(std::move(config)), identity_(std::move(identity)), directory_(std::move(directory))
 {}
+
+// Keys must not linger in freed memory. Best effort: copies made by std::string/std::vector while growing are not reachable.
+Client::~Client()
+{
+	if (!aesKey_.empty())
+		CryptoPP::SecureWipeArray(aesKey_.data(), aesKey_.size());
+	if (identity_ && !identity_->privateKey.empty())
+		CryptoPP::SecureWipeArray(identity_->privateKey.data(), identity_->privateKey.size());
+}
 
 bool Client::run()
 {
@@ -219,6 +228,7 @@ void Client::setAesKeyFromResponse(const Response& response)
 			+ " bytes, expected " + std::to_string(Protocol::AES_KEY_SIZE));
 
 	aesKey_.assign(aesKey.begin(), aesKey.end());
+	CryptoPP::SecureWipeArray(aesKey.data(), aesKey.size());
 	log("key exchange complete");
 }
 
