@@ -46,6 +46,7 @@ def handle_public_key(conn, client_id, payload):
     aes_key = get_random_bytes(AES_KEY_SIZE)
     encrypted = PKCS1_OAEP.new(RSA.import_key(public_key)).encrypt(aes_key)
     entry["aes_key"] = aes_key
+    entry["public_key"] = public_key
     print(f"[server] '{name}': AES key created, encrypted with the client's public key ({len(encrypted)} bytes)")
     send_response(conn, 1602, client_id + encrypted)
 
@@ -56,11 +57,24 @@ def handle_register(conn, client_id, payload):
         send_response(conn, 1601)
         return
     new_id = uuid.uuid4().bytes
-    clients[name] = {"id": new_id, "aes_key": None}
+    clients[name] = {"id": new_id, "public_key": None, "aes_key": None}
     print(f"[server] registered '{name}' as {new_id.hex()}")
     send_response(conn, 1600, new_id)
 
-HANDLERS = {825: handle_register, 826: handle_public_key}
+def handle_reconnect(conn, client_id, payload):
+    name = parse_name(payload[:NAME_SIZE])
+    entry = clients.get(name)
+    if entry is None or entry["id"] != client_id or entry["public_key"] is None:
+        print(f"[server] reconnect denied for '{name}'")
+        send_response(conn, 1606, client_id)
+        return
+    aes_key = get_random_bytes(AES_KEY_SIZE)
+    encrypted = PKCS1_OAEP.new(RSA.import_key(entry["public_key"])).encrypt(aes_key)
+    entry["aes_key"] = aes_key
+    print(f"[server] '{name}' reconnected: new AES key, encrypted with the stored public key")
+    send_response(conn, 1605, client_id + encrypted)
+
+HANDLERS = {825: handle_register, 826: handle_public_key, 827: handle_reconnect}
 
 def serve(conn):
     while True:

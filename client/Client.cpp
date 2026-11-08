@@ -40,6 +40,10 @@ bool Client::run()
 
 	connect();
 
+	// A denied reconnect clears the identity, so the client falls through to registration
+	if (identity_ && !reconnect())
+		log("continuing as a new client");
+
 	if (!identity_)
 	{
 		registerNew();
@@ -155,4 +159,30 @@ void Client::setAesKeyFromResponse(const Response& response)
 
 	aesKey_.assign(aesKey.begin(), aesKey.end());
 	log("key exchange complete");
+}
+
+// Returns true if the server accepted the reconnect (1605) and sent an AES key.
+// Returns false on 1606: the server does not know this client, so the old identity is deleted.
+bool Client::reconnect()
+{
+	if (identity_->name != config_.clientName)
+		log("warning: transfer.json says \"" + config_.clientName + "\", but this client is registered as \""
+			+ identity_->name + "\" - reconnecting with the registered name");
+
+	log("reconnecting as \"" + identity_->name + "\"");
+	const Response response = exchange(Protocol::RequestCode::Reconnect, Protocol::makeNameField(identity_->name),
+		{ Protocol::ResponseCode::ReconnectOk, Protocol::ResponseCode::ReconnectDenied });
+
+	if (response.code == Protocol::ResponseCode::ReconnectDenied)
+	{
+		if (Protocol::parseClientIdPayload(response.payload) != identity_->id)
+			throw std::runtime_error("the server denied the reconnect for a different client ID");
+		log("reconnect denied - the server does not know this client; registering again");
+		deleteIdentity(directory_);
+		identity_.reset();
+		return false;
+	}
+
+	setAesKeyFromResponse(response);
+	return true;
 }

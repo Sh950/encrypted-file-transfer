@@ -39,6 +39,7 @@ private:
 	void registerNew();
 	void sendPublicKey();
 	void setAesKeyFromResponse(const Response& response);
+	bool reconnect();
 
 	TransferConfig config_;
 	std::optional<ClientIdentity> identity_;
