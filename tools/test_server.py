@@ -3,6 +3,7 @@ import socket
 import struct
 import uuid
 import os
+import argparse
 from Crypto.Util.Padding import unpad
 from cksum import memcrc
 from Crypto.Cipher import PKCS1_OAEP, AES
@@ -19,8 +20,18 @@ AES_KEY_SIZE = 32
 FILE_PACKET_HEADER = struct.Struct("<IIHH")   # content size, orig size, packet number, total packets
 RECEIVED_DIR = os.path.join(os.path.dirname(__file__), "received")
 transfers = {}   # (client id, file name) -> list of encrypted chunks
-
 clients = {}   # name -> {"id", "public_key", "aes_key"}, kept only while the server runs
+faults = {"bad_crc": 0, "fail": {}}   # remaining injected faults, set from the command line
+
+
+def take_fault(code):
+    """True if the next request with this code should be answered with 1607 (and counts it down)."""
+    remaining = faults["fail"].get(code, 0)
+    if remaining > 0:
+        faults["fail"][code] = remaining - 1
+        print(f"[server] FAULT: answering {code} with 1607")
+        return True
+    return False
 
 def recv_exact(conn, size):
     data = b""
@@ -104,10 +115,19 @@ def handle_file_packet(conn, client_id, payload):
     transfers[key].append(chunk)
     if packet < total:
         return   # no answer until the last packet
+    
+    if take_fault(828):
+        transfers.pop(key, None)
+        send_response(conn, 1607)
+        return
 
     encrypted = b"".join(transfers.pop(key))
     content = unpad(AES.new(entry["aes_key"], AES.MODE_CBC, iv=bytes(16)).decrypt(encrypted), 16)
     crc = memcrc(content)
+    if faults["bad_crc"] > 0:
+        faults["bad_crc"] -= 1
+        crc ^= 0xFFFFFFFF
+        print("[server] FAULT: sending a wrong CRC")
     os.makedirs(RECEIVED_DIR, exist_ok=True)
     with open(os.path.join(RECEIVED_DIR, file_name), "wb") as f:
         f.write(content)
@@ -137,13 +157,24 @@ def serve(conn):
         payload = recv_exact(conn, size)
         print(f"[server] received {code} (client version {version}, {size} payload bytes)")
         handler = HANDLERS.get(code)
-        if handler is None:
+        # 828 faults are injected only on the last packet, inside handle_file_packet
+        if handler is None or (code != 828 and take_fault(code)):
             send_response(conn, 1607)
         else:
             handler(conn, client_id, payload)
 
 
 def main():
+
+    parser = argparse.ArgumentParser(description="Test server for the client")
+    parser.add_argument("--bad-crc", type=int, default=0, metavar="N",
+                        help="send a wrong CRC in the next N 1603 responses")
+    parser.add_argument("--fail", nargs=2, type=int, action="append", default=[], metavar=("CODE", "N"),
+                        help="answer the next N requests with this code with 1607 (repeatable)")
+    args = parser.parse_args()
+    faults["bad_crc"] = args.bad_crc
+    faults["fail"] = {code: count for code, count in args.fail}
+
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server.bind((HOST, PORT))
