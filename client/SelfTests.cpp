@@ -30,7 +30,7 @@ void hexify(const unsigned char* buffer, unsigned int length)
 	std::cout.flags(f);
 }
 
-
+// Test data here is a few dozen bytes, so the size_t -> unsigned int casts below cannot truncate.
 int aes_example()
 {
 	std::cout << std::endl << std::endl << "----- AES EXAMPLE -----" << std::endl << std::endl;
@@ -53,12 +53,11 @@ int aes_example()
 	}
 
 	// 2. encrypt a message (plain text)
-	std::string ciphertext = aes.encrypt(plaintext.c_str(), plaintext.length());
-	std::cout << "Cipher:" << std::endl;
-	hexify(reinterpret_cast<const unsigned char*>(ciphertext.c_str()), ciphertext.length());	// print binary data nicely
+	std::string ciphertext = aes.encrypt(plaintext.c_str(), static_cast<unsigned int>(plaintext.length()));	std::cout << "Cipher:" << std::endl;
+	hexify(reinterpret_cast<const unsigned char*>(ciphertext.c_str()), static_cast<unsigned int>(ciphertext.length()));
 
 	// 3. decrypt a message (cipher text)
-	std::string decrypttext = aes.decrypt(ciphertext.c_str(), ciphertext.length());
+	std::string decrypttext = aes.decrypt(ciphertext.c_str(), static_cast<unsigned int>(ciphertext.length()));
 	std::cout << "Decrypted:" << std::endl << decrypttext << std::endl;
 
 	return 0;
@@ -88,7 +87,7 @@ int rsa_example()
 	RSAPublicWrapper rsapub(pubkey);
 	std::string cipher = rsapub.encrypt((const char*)plain, sizeof(plain));	// you can encrypt a const char* or an std::string 
 	std::cout << "cipher:" << std::endl;
-	hexify((unsigned char*)cipher.c_str(), cipher.length());	// print binary data nicely
+	hexify((unsigned char*)cipher.c_str(), static_cast<unsigned int>(cipher.length()));
 
 
 	// 4. get the private key and encode it as base64 (base64 in not necessary for an RSA decryptor.)
@@ -100,7 +99,7 @@ int rsa_example()
 
 	std::string decrypted = rsapriv_other.decrypt(cipher);		// 6. you can decrypt an std::string or a const char* buffer
 	std::cout << "decrypted:" << std::endl;
-	hexify((unsigned char*)decrypted.c_str(), decrypted.length());	// print binary data nicely
+	hexify((unsigned char*)decrypted.c_str(), static_cast<unsigned int>(decrypted.length()));
 
 	return 0;
 }
