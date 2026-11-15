@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <array>
 #include <vector>
+#include <string>
 
 #include "AESWrapper.h"
 #include "RSAWrapper.h"

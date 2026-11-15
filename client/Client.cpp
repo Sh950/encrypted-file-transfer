@@ -168,6 +168,8 @@ bool Client::reconnect()
 			throw std::runtime_error("the server denied the reconnect for a different client ID");
 		log("reconnect denied - the server does not know this client; registering again");
 		deleteIdentity(directory_);
+		// The old key is no longer used: wipe it before the identity is released
+		CryptoPP::SecureWipeArray(identity_->privateKey.data(), identity_->privateKey.size());
 		identity_.reset();
 		return false;
 	}

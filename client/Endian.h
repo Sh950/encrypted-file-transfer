@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <vector>
+#include <cstddef>
 
 void appendU16(std::vector<uint8_t>& out, uint16_t value);
 void appendU32(std::vector<uint8_t>& out, uint32_t value);

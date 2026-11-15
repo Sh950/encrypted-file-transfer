@@ -50,13 +50,13 @@ private:
 	void sendPublicKey();
 	void setAesKeyFromResponse(const Response& response);
 	bool reconnect();
+	FileResult sendFile(const std::filesystem::path& path);
+	std::optional<PreparedFile> prepareFile(const std::filesystem::path& path);
+	void sendPackets(const PreparedFile& file);
 
 	TransferConfig config_;
 	std::optional<ClientIdentity> identity_;
 	std::filesystem::path directory_;
 	std::optional<TcpConnection> connection_;
-	std::vector<uint8_t> aesKey_;	// received from the server; empty until the key 
-	FileResult sendFile(const std::filesystem::path& path);
-	std::optional<PreparedFile> prepareFile(const std::filesystem::path& path);
-	void sendPackets(const PreparedFile& file);
+	std::vector<uint8_t> aesKey_;	// received from the server; empty until the key 	
 };

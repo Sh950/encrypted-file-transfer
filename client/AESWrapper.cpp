@@ -16,18 +16,13 @@ AESWrapper::AESWrapper(const unsigned char* key, unsigned int length)
 	if (key == nullptr)
 		throw std::invalid_argument("AES key is null");
 	if (length != DEFAULT_KEYLENGTH)
-		throw std::length_error("key length must be 32 bytes");
+		throw std::length_error("key length must be " + std::to_string(DEFAULT_KEYLENGTH) + " bytes");
 	memcpy_s(_key, DEFAULT_KEYLENGTH, key, length);
 }
 
 AESWrapper::~AESWrapper()
 {
 	CryptoPP::SecureWipeArray(_key, DEFAULT_KEYLENGTH);
-}
-
-const unsigned char* AESWrapper::getKey() const 
-{ 
-	return _key; 
 }
 
 std::string AESWrapper::encrypt(const char* plain, unsigned int length)
