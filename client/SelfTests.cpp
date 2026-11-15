@@ -2,7 +2,7 @@
 #include "RSAWrapper.h"
 #include "AESWrapper.h"
 #include "Protocol.h"
-#include "CKsum.h"
+#include "Cksum.h"
 #include "TransferConfig.h"
 #include "ClientIdentity.h"
 #include "FileUtils.h"

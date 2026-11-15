@@ -2,13 +2,12 @@
 #define NOMINMAX
 #include <winsock2.h>
 #include <ws2tcpip.h>
-
-#include "TcpConnection.h"
-
 #include <algorithm>
 #include <limits>
 #include <memory>
 #include <stdexcept>
+
+#include "TcpConnection.h"
 
 static_assert(sizeof(SOCKET) == sizeof(std::uintptr_t), "SOCKET must fit in std::uintptr_t");
 
