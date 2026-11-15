@@ -1,32 +1,30 @@
 #include "Client.h"
 #include "ClientIdentity.h"
 #include "FileUtils.h"
-#include "SelfTests.h"
 #include "TcpConnection.h"
 #include "TransferConfig.h"
 
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <iostream>
-#include <string>
+#include <optional>
 #include <utility>
 
 namespace
 {
-	constexpr const char* SELF_TEST_FLAG = "--self-test";
 	constexpr const char* TRANSFER_CONFIG_FILE_NAME = "transfer.json";
 }
 
-int main(int argc, char* argv[])
+// Batch mode: no input from the user; everything comes from files in the exe directory
+int main()
 {
-	// Development only: client.exe --self-test runs the component tests instead of the client
-	if (argc >= 2 && std::string(argv[1]) == SELF_TEST_FLAG)
-		return runSelfTests();
-
 	try
 	{
 		const std::filesystem::path directory = FileUtils::getExecutableDirectory();
 		TransferConfig config = loadTransferConfig(directory / TRANSFER_CONFIG_FILE_NAME);
+
+		// A corrupted me.info throws: an existing client must not register again
 		std::optional<ClientIdentity> identity = loadIdentity(directory);
 
 		WinsockSession winsock;
